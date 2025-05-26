@@ -74,7 +74,10 @@ for pid in path_ids:
     output_html = f"temp_path_{pid}.html"
     map_obj.save(output_html)
     # webbrowser.open(f"file://{os.path.abspath(output_html)}")
-    subprocess.Popen([firefox_path, "--new-tab", os.path.abspath(output_html)])
+    # Launch Firefox
+    if firefox_path is None:
+        raise RuntimeError("Firefox not found.")
+    proc = subprocess.Popen([firefox_path, os.path.abspath(output_html)])
 
     # Ask user for score
     while True:
@@ -89,7 +92,14 @@ for pid in path_ids:
 
     scores.append({"path_id": pid, "score": score})
 
-    time.sleep(2)
+    # Close Firefox window
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+    # Clean up HTML
     os.remove(output_html)
 
 with open("path_scores.csv", "w", newline='') as f:
