@@ -5,10 +5,13 @@ import random
 import webbrowser
 import os
 import time
+import subprocess
 
 # --- Read paths CSV directly ---
 input_csv = "paths.csv"
 paths_df = pd.read_csv(input_csv)
+
+firefox_path = "/usr/bin/firefox"  # adjust path if needed
 
 # --- Coordinate Transformation ---
 transformer = Transformer.from_crs("EPSG:32651", "EPSG:4326", always_xy=True)
@@ -70,7 +73,8 @@ for pid in path_ids:
     # Save and show map
     output_html = f"temp_path_{pid}.html"
     map_obj.save(output_html)
-    webbrowser.open(f"file://{os.path.abspath(output_html)}")
+    # webbrowser.open(f"file://{os.path.abspath(output_html)}")
+    subprocess.Popen([firefox_path, "--new-tab", os.path.abspath(output_html)])
 
     # Ask user for score
     while True:
@@ -87,3 +91,9 @@ for pid in path_ids:
 
     time.sleep(2)
     os.remove(output_html)
+
+with open("path_scores.csv", "w", newline='') as f:
+    f.write("path_id,score\n")
+    for entry in scores:
+        f.write(f"{entry['path_id']},{entry['score']}\n")
+    f.write("path_id,score\n")
