@@ -8,6 +8,8 @@ from tqdm import tqdm
 import folium
 import networkx as nx
 import branca.colormap as cm
+import matplotlib.colors as mcolors             # Convert numeric to color
+import matplotlib.cm as cmx
 
 # Target city and coordinate system
 city = "Tainan, Taiwan"
@@ -187,10 +189,14 @@ if __name__ == '__main__':
         sidewalks = ox.features_from_place(city, tags=sidewalk_tags)
         # only want Linestring type data to calculate ratio, point, polygon will be filtered
         sidewalks = sidewalks[sidewalks.geometry.type == 'LineString']
-        sidewalks = flatten_attributes(sidewalks)
         sidewalks = sidewalks[~sidewalks['geometry'].isna()]
+        sidewalks = flatten_attributes(sidewalks)
         sidewalks.to_file(sidewalk_path, driver="GeoJSON")
         sidewalks = sidewalks.to_crs(epsg=projected_epsg)
+
+    print("==========Sidewalks==========")
+    print(sidewalks['geometry'].geom_type.value_counts())
+    print("=============================\n")
 
     #======================# 
     # Calculate attributes #
@@ -236,7 +242,7 @@ if __name__ == '__main__':
     #============# 
     # CSV Output #
     #============#
-
+    csv_path = "tainan_edges.csv"
     # Extract coordinate, each data point is coordinate under ESPG 32651
     edges['start_x'] = edges.geometry.apply(lambda line: line.coords[0][0])
     edges['start_y'] = edges.geometry.apply(lambda line: line.coords[0][1])
@@ -247,45 +253,60 @@ if __name__ == '__main__':
     output_df = edges[['start_x', 'start_y', 'end_x', 'end_y', 'distance',
                     'green_ratio', 'pavement_ratio', 'shade']]
 
-    output_df.to_csv("tainan_edges.csv", index=False)
-    print("CSV exported to tainan_edges.csv")
+    output_df.to_csv(csv_path, index=False)
+    print("CSV exported to", csv_path)
     
     #======================# 
     #      Render map      #
     #======================#
 
-    # print("Rendering interactive map...")
-    # center_latlon = ox.geocode(city)
-    # m = folium.Map(location=center_latlon, zoom_start=14, tiles="CartoDB positron")
+    map_path = "tainan_map.html"
+    print("Rendering interactive map...")
+    center_latlon = ox.geocode(city)
+    m = folium.Map(location=center_latlon, zoom_start=14, tiles="CartoDB positron")
 
-    # edges_wgs = edges.to_crs(epsg=4326)
+    edges_wgs = edges.to_crs(epsg=4326)
 
-    # def classify_color(row):
-    #     if row['shade'] > 0:
-    #         return 'blue'
-    #     elif row['green_ratio'] > 0:
-    #         return 'green'
-    #     elif row['pavement_ratio'] > 0:
-    #         return 'red'
-    #     else:
-    #         return 'black'
+    def compute_score(row):
+        return (
+            1.0 * row['green_ratio'] +
+            1.0 * row['shade'] +
+            1.0 * row['pavement_ratio']
+        )
 
-    # for _, row in edges_wgs.iterrows():
-    #     coords = list(row['geometry'].coords)
-    #     popup_text = (
-    #         f"<b>Green ratio</b>: {row['green_ratio']:.2f}<br>"
-    #         f"<b>Shade ratio</b>: {row['shade']:.2f}<br>"
-    #         f"<b>Pavement ratio</b>: {row['pavement_ratio']:.2f}<br>"
-    #         f"<b>Length</b>: {row['distance']:.1f} m"
-    #     )
-    #     folium.PolyLine(
-    #         locations=[(y, x) for x, y in coords],
-    #         color=classify_color(row),
-    #         weight=3,
-    #         opacity=0.8,
-    #         popup=folium.Popup(popup_text, max_width=250),
-    #     ).add_to(m)
+    edges_wgs['score'] = edges_wgs.apply(compute_score, axis=1)
+    score_min = edges_wgs['score'].min()
+    score_max = edges_wgs['score'].max()
 
-    # m.save("tainan_map.html")
-    # print("Map saved as tainan_map.html")
+    # Configure gradient (plasma, viridis, inferno, etc.)
+    colormap = cmx.ScalarMappable(norm=mcolors.Normalize(vmin=score_min, vmax=score_max), cmap='viridis')
+
+    for _, row in edges_wgs.iterrows():
+        coords = list(row['geometry'].coords)
+        popup_text = (
+            f"<b>Green ratio</b>: {row['green_ratio']:.2f}<br>"
+            f"<b>Shade ratio</b>: {row['shade']:.2f}<br>"
+            f"<b>Pavement ratio</b>: {row['pavement_ratio']:.2f}<br>"
+            f"<b>Length</b>: {row['distance']:.1f} m<br>"
+            f"<b>Score</b>: {row['score']:.2f}"
+        )
+
+        color = mcolors.to_hex(colormap.to_rgba(row['score']))
+
+        folium.PolyLine(
+            locations=[(y, x) for x, y in coords],
+            color=color,
+            weight=4,
+            opacity=0.85,
+            popup=folium.Popup(popup_text, max_width=250),
+        ).add_to(m)
+
+    # legend 
+    colormap._A = []  # trick to make ScalarMappable printable
+    colormap_caption = cm.LinearColormap(['#440154', '#21918c', '#fde725'], vmin=score_min, vmax=score_max)
+    colormap_caption.caption = 'Path Quality Score'
+    colormap_caption.add_to(m)
+
+    m.save(map_path)
+    print(f"Map saved as {map_path}")
 
