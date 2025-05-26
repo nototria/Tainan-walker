@@ -1,46 +1,48 @@
 import pandas as pd
 import folium
 from pyproj import Transformer
-import random
 import webbrowser
 import os
-import time
-import subprocess
 
-# --- Read paths CSV directly ---
+# --- Read paths CSV ---
 input_csv = "paths.csv"
 paths_df = pd.read_csv(input_csv)
 
-firefox_path = "/usr/bin/firefox"  # adjust path if needed
-
-# --- Coordinate Transformation ---
+# --- Coordinate transformer from EPSG:32651 to EPSG:4326 (WGS84) ---
 transformer = Transformer.from_crs("EPSG:32651", "EPSG:4326", always_xy=True)
 
 def transform_coords(x, y):
     lon, lat = transformer.transform(x, y)
-    return lat, lon  # folium wants (lat, lon)
+    return lat, lon  # folium expects (lat, lon)
 
-# --- Scoring Output ---
-scores = []
-
-# --- Process Each Path Individually ---
-path_ids = paths_df["path_id"].unique()
-
+# --- Color logic ---
 def ratio_to_color(green, pavement, shade):
     max_val = max(green, pavement, shade)
     if max_val == 0:
         return "#000000"  # Black for no features
     elif max_val == green:
-        return f"#{int(0):02x}{int(255 * green):02x}{int(0):02x}"
+        # Green channel saturation
+        g = int(255 * green)
+        return f"#{0:02x}{g:02x}{0:02x}"
     elif max_val == pavement:
-        return f"#{int(255 * pavement):02x}{int(0):02x}{int(0):02x}"
-    elif max_val == shade:
-        return f"#{int(0):02x}{int(0):02x}{int(255 * shade):02x}"
+        # Red channel saturation
+        r = int(255 * pavement)
+        return f"#{r:02x}{0:02x}{0:02x}"
+    else:
+        # Blue channel saturation (shade)
+        b = int(255 * shade)
+        return f"#{0:02x}{0:02x}{b:02x}"
+
+# --- Store scores here ---
+scores = []
+
+# --- Process each path ---
+path_ids = paths_df["path_id"].unique()
 
 for pid in path_ids:
     df_pid = paths_df[paths_df["path_id"] == pid]
 
-    # --- Compute all coordinates ---
+    # Collect all coordinates for fit_bounds
     all_coords = []
     for _, row in df_pid.iterrows():
         lat1, lon1 = transform_coords(row.start_x, row.start_y)
@@ -52,33 +54,24 @@ for pid in path_ids:
     sw = [min(lats), min(lons)]
     ne = [max(lats), max(lons)]
 
-    # --- Create map with fit_bounds to show full path ---
+    # Create map and fit bounds
     map_obj = folium.Map()
     map_obj.fit_bounds([sw, ne])
 
-    # --- Draw segments ---
+    # Draw all segments with color based on ratios
     for _, row in df_pid.iterrows():
         lat1, lon1 = transform_coords(row.start_x, row.start_y)
         lat2, lon2 = transform_coords(row.end_x, row.end_y)
-
         color = ratio_to_color(row.green_ratio, row.pavement_ratio, row.shade)
+        folium.PolyLine([(lat1, lon1), (lat2, lon2)],
+                        color=color, weight=6, opacity=0.9).add_to(map_obj)
 
-        folium.PolyLine(
-            [(lat1, lon1), (lat2, lon2)],
-            color=color,
-            weight=6,
-            opacity=0.9
-        ).add_to(map_obj)
-
-    # Save and show map
+    # Save HTML file
     output_html = f"temp_path_{pid}.html"
     map_obj.save(output_html)
-    # webbrowser.open(f"file://{os.path.abspath(output_html)}")
-    # Launch Firefox
-    if firefox_path is None:
-        raise RuntimeError("Firefox not found.")
-    time.sleep(2)  # Give time for the browser to open
-    proc = subprocess.Popen([firefox_path, os.path.abspath(output_html)])
+
+    # Open in default browser (reuse tab if Firefox)
+    webbrowser.open_new_tab(f"file://{os.path.abspath(output_html)}")
 
     # Ask user for score
     while True:
@@ -93,16 +86,14 @@ for pid in path_ids:
 
     scores.append({"path_id": pid, "score": score})
 
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-    # Clean up HTML
+    # Remove HTML file after scoring
     os.remove(output_html)
 
-with open("path_scores.csv", "w", newline='') as f:
+# Save all scores to CSV
+score_csv = "path_scores.csv"
+with open(score_csv, "w") as f:
     f.write("path_id,score\n")
     for entry in scores:
         f.write(f"{entry['path_id']},{entry['score']}\n")
-    f.write("path_id,score\n")
+
+print(f"All scores saved to {score_csv}")
