@@ -23,33 +23,51 @@ scores = []
 # --- Process Each Path Individually ---
 path_ids = paths_df["path_id"].unique()
 
+def ratio_to_color(green, pavement, shade):
+    max_val = max(green, pavement, shade)
+    if max_val == 0:
+        return "#000000"  # Black for no features
+    elif max_val == green:
+        return f"#{int(0):02x}{int(255 * green):02x}{int(0):02x}"
+    elif max_val == pavement:
+        return f"#{int(255 * pavement):02x}{int(0):02x}{int(0):02x}"
+    elif max_val == shade:
+        return f"#{int(0):02x}{int(0):02x}{int(255 * shade):02x}"
+
 for pid in path_ids:
     df_pid = paths_df[paths_df["path_id"] == pid]
-    
-    # Get center from first point
-    first = df_pid.iloc[0]
-    center_lat, center_lon = transform_coords(first.start_x, first.start_y)
-    map_obj = folium.Map(location=[center_lat, center_lon], zoom_start=15)
 
-    # Build coordinates for the path
-    coords = []
+    # --- Compute all coordinates ---
+    all_coords = []
     for _, row in df_pid.iterrows():
         lat1, lon1 = transform_coords(row.start_x, row.start_y)
         lat2, lon2 = transform_coords(row.end_x, row.end_y)
-        coords.append((lat1, lon1))
-        coords.append((lat2, lon2))
+        all_coords.append((lat1, lon1))
+        all_coords.append((lat2, lon2))
 
-    # Remove duplicates while preserving order
-    unique_coords = []
-    for c in coords:
-        if not unique_coords or unique_coords[-1] != c:
-            unique_coords.append(c)
+    lats, lons = zip(*all_coords)
+    sw = [min(lats), min(lons)]
+    ne = [max(lats), max(lons)]
 
-    # Draw polyline
-    color = f"#{random.randint(0, 0xFFFFFF):06x}"
-    folium.PolyLine(unique_coords, color=color, weight=5, opacity=0.8).add_to(map_obj)
+    # --- Create map with fit_bounds to show full path ---
+    map_obj = folium.Map()
+    map_obj.fit_bounds([sw, ne])
 
-    # Save and open map
+    # --- Draw segments ---
+    for _, row in df_pid.iterrows():
+        lat1, lon1 = transform_coords(row.start_x, row.start_y)
+        lat2, lon2 = transform_coords(row.end_x, row.end_y)
+
+        color = ratio_to_color(row.green_ratio, row.pavement_ratio, row.shade)
+
+        folium.PolyLine(
+            [(lat1, lon1), (lat2, lon2)],
+            color=color,
+            weight=6,
+            opacity=0.9
+        ).add_to(map_obj)
+
+    # Save and show map
     output_html = f"temp_path_{pid}.html"
     map_obj.save(output_html)
     webbrowser.open(f"file://{os.path.abspath(output_html)}")
@@ -65,16 +83,7 @@ for pid in path_ids:
         except ValueError:
             print("Please enter a valid integer.")
 
-    # Append to scores
     scores.append({"path_id": pid, "score": score})
 
-    # Optional: allow user to see the map for a few seconds before continuing
     time.sleep(2)
-
-    # Optionally delete temp file:
     os.remove(output_html)
-
-# --- Save scores ---
-scores_df = pd.DataFrame(scores)
-scores_df.to_csv("score.csv", index=False)
-print("Scores saved to score.csv")
