@@ -77,6 +77,7 @@ for pid in path_ids:
     # Launch Firefox
     if firefox_path is None:
         raise RuntimeError("Firefox not found.")
+    time.sleep(2)  # Give time for the browser to open
     proc = subprocess.Popen([firefox_path, os.path.abspath(output_html)])
 
     # Ask user for score
@@ -92,13 +93,11 @@ for pid in path_ids:
 
     scores.append({"path_id": pid, "score": score})
 
-    # Close Firefox window
     proc.terminate()
     try:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
-
     # Clean up HTML
     os.remove(output_html)
 
