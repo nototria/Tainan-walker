@@ -72,7 +72,7 @@ def sanity_check_graph(G,source, target, target_distance, tolerance):
         raise ValueError(f"Shortest path length {min_len} is out of bounds {target_distance * (1 + tolerance)}.")    
     return source, target
 
-def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
+def find_k_paths_with_distance_and_tolerance(G_base,source,target,path_SN,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
     min_dist = 0
     max_dist = target_distance * (1 + tolerance)
     results = []
@@ -112,7 +112,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,targ
 
 
         if not chosen:
-            print(f"No more paths within tolerance after {found['value']} paths.")
+            print(f"No more paths within tolerance after {path_SN['value']} paths.")
             break
         
         # record edges
@@ -126,7 +126,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,targ
             for u, v in path_edges(chosen):
                 data = G_work[u][v]
                 results.append({
-                    'path_id':         found['value'] + 1,
+                    'path_id':         path_SN['value'] + 1,
                     'start_x':         u[0],  'start_y': u[1],
                     'end_x':           v[0],  'end_y':   v[1],
                     'distance':        data['distance'],
@@ -134,7 +134,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,targ
                     'shade':           data['shade'],
                     'pavement_ratio':  data['pavement_ratio']
                 })
-            found['value'] += 1
+            path_SN['value'] += 1
 
         # randomly remove edges in the middle 2% of the path
         edges_list = path_edges(chosen)
@@ -158,14 +158,13 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,targ
             'green_ratio','shade','pavement_ratio']
     with open(output_csv, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=keys)
-        
-        # 如果檔案是空的，再寫入 header
+        # write header only if file is empty
         if f.tell() == 0:
             writer.writeheader()
         
         writer.writerows(results)
 
-    print(f"Exported {len(results)} edges across {found} paths to '{output_csv}'.")
+    print(f"Exported {len(results)} edges across {path_SN} paths to '{output_csv}'.")
 
 def generate_paths_from_points(source, target):
     load_path = os.path.join(BASE_DIR, '..', 'CSV_file', 'tainan_edges.csv')
@@ -183,6 +182,7 @@ def generate_paths_from_points(source, target):
     maximum_time = 60
     output_csv = os.path.join(BASE_DIR, '..', 'CSV_file', 'paths.csv')
     mer = 0.005
+    PSN = {'value': 1}
     # testcase
 
 
@@ -203,5 +203,6 @@ def generate_paths_from_points(source, target):
             tolerance      = t,
             max_time       = maximum_time,
             output_csv     = output_csv,
-            found          = founded
+            middle_edges_ratio= mer,
+            path_SN          = PSN
         )
