@@ -72,7 +72,7 @@ def sanity_check_graph(G,source, target, target_distance, tolerance):
         raise ValueError(f"Shortest path length {min_len} is out of bounds {target_distance * (1 + tolerance)}.")    
     return source, target
 
-def find_k_paths_with_distance_and_tolerance(G_base,source,target,path_SN,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
+def find_k_path(G_base, source, target, output_csv, path_SN, k=3, target_distance=200.0, tolerance=0.05, max_time=30, middle_edges_ratio=0.02):
     min_dist = 0
     max_dist = target_distance * (1 + tolerance)
     results = []
@@ -194,7 +194,7 @@ def chlee_test_file_what_the_fuck(source, target):
         print("Performing sanity checks on graph...")
         source_checked, target_checked = sanity_check_graph(G, source, target, distance, t)
         print(f"Sanity check passed for pair {idx}...\nFinding paths...")
-        find_k_paths_with_distance_and_tolerance(
+        find_k_path(
             G_base         = G,
             source         = source_checked,
             target         = target_checked,
@@ -207,7 +207,7 @@ def chlee_test_file_what_the_fuck(source, target):
             path_SN          = PSN
         )
 
-def generate_paths_from_points(edgefile_path, source, target, k=3, target_distance=200.0, tolerance=0.05, max_time=30, output_csv='paths.csv', middle_edges_ratio=0.02):
+def generate_paths_from_points(edgefile_path, source, target, output_csv, k=3, target_distance=200.0, tolerance=0.05, max_time=30, middle_edges_ratio=0.02):
     """
     Generate paths from source to target using the specified parameters.
     
@@ -229,7 +229,7 @@ def generate_paths_from_points(edgefile_path, source, target, k=3, target_distan
     
     print("Finding paths...")
     PSN = {'value': 1}
-    find_k_paths_with_distance_and_tolerance(
+    find_k_path(
         G_base         = G,
         source         = source_checked,
         target         = target_checked,
