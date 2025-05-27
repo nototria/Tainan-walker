@@ -4,6 +4,7 @@ import csv
 import math
 import time
 import random
+import os
 
 #Helper
 def load_edges(file_path):
@@ -70,13 +71,12 @@ def sanity_check_graph(G,source, target, target_distance, tolerance):
         raise ValueError(f"Shortest path length {min_len} is out of bounds {target_distance * (1 + tolerance)}.")    
     return source, target
 
-def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
+def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
     min_dist = 0
     max_dist = target_distance * (1 + tolerance)
     results = []
     G_work  = G_base.copy()
     start_time = time.time()
-    found = 0
     for path_id in range(1, k+1):
         # time cutoff
         if time.time() - start_time > max_time:
@@ -111,7 +111,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
 
 
         if not chosen:
-            print(f"No more paths within tolerance after {found} paths.")
+            print(f"No more paths within tolerance after {found['value']} paths.")
             break
         
         # record edges
@@ -125,7 +125,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
             for u, v in path_edges(chosen):
                 data = G_work[u][v]
                 results.append({
-                    'path_id':         found + 1,
+                    'path_id':         found['value'] + 1,
                     'start_x':         u[0],  'start_y': u[1],
                     'end_x':           v[0],  'end_y':   v[1],
                     'distance':        data['distance'],
@@ -133,7 +133,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
                     'shade':           data['shade'],
                     'pavement_ratio':  data['pavement_ratio']
                 })
-            found += 1
+            found['value'] += 1
 
         # randomly remove edges in the middle 2% of the path
         edges_list = path_edges(chosen)
@@ -155,40 +155,52 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
     # write CSV
     keys = ['path_id','start_x','start_y','end_x','end_y','distance',
             'green_ratio','shade','pavement_ratio']
-    with open(output_csv, 'w', newline='') as f:
+    with open(output_csv, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
+        
+        # 如果檔案是空的，再寫入 header
+        if f.tell() == 0:
+            writer.writeheader()
+        
         writer.writerows(results)
 
     print(f"Exported {len(results)} edges across {found} paths to '{output_csv}'.")
 
 if __name__ == '__main__':
+    if os.path.exists('paths.csv'):
+        os.remove('paths.csv')
     df = load_edges('tainan_edges.csv')
     print("Building graph from edges...")
     G = build_graph(df)
-    
+
+    points_df = pd.read_csv('tainan_random_routes.csv')
     # testcase
-    source = (214348.3195031177,2547868.730116239)
-    target = (215172.271623499,2545335.762676438)
-    distance = 60000.0
+    founded = {'value': 0}
+    distance = 500000.0
     t = 1
-    k_length = 200
+    k_length = 10
     maximum_time = 60
     output_csv = 'paths.csv'
-    mer = 0.005
+    mer = 0.01
     # testcase
 
-    print("Performing sanity checks on graph...")
-    source, target = sanity_check_graph(G, source, target, distance, t)
-    print("Sanity check pass...\nFinding paths...")
-    find_k_paths_with_distance_and_tolerance(
-        G_base         = G,
-        source          = source,
-        target          = target,
-        k               = k_length,
-        target_distance = distance,
-        tolerance       = t,
-        max_time        = maximum_time,
-        output_csv      = output_csv,
-        middle_edges_ratio= mer
-    )
+
+    for idx, row in points_df.iterrows():
+        source = (row['start_x'], row['start_y'])
+        target = (row['end_x'], row['end_y'])
+        output_csv = 'paths.csv'
+
+        print("Performing sanity checks on graph...")
+        source_checked, target_checked = sanity_check_graph(G, source, target, distance, t)
+        print(f"Sanity check passed for pair {idx}...\nFinding paths...")
+        find_k_paths_with_distance_and_tolerance(
+            G_base         = G,
+            source         = source_checked,
+            target         = target_checked,
+            k              = k_length,
+            target_distance= distance,
+            tolerance      = t,
+            max_time       = maximum_time,
+            output_csv     = output_csv,
+            found          = founded
+        )
