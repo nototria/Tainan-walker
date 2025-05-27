@@ -4,6 +4,7 @@ import csv
 import math
 import time
 import random
+from scipy.spatial import KDTree
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,14 +24,17 @@ def build_graph(df):
         }
         G.add_edge(u, v, **attrs)
     return G
+
 def find_nearest_node(coord, nodes, tol=1e-3):
     x0, y0 = coord
-    nearest, min_dist = None, float('inf')
-    for node in nodes:
-        d = math.hypot(node[0] - x0, node[1] - y0)
-        if d < min_dist:
-            nearest, min_dist = node, d
-    return nearest if min_dist <= tol else None
+    # nearest, min_dist = None, float('inf')
+    # for node in nodes:
+    #     d = math.hypot(node[0] - x0, node[1] - y0)
+    #     if d < min_dist:
+    #         nearest, min_dist = node, d
+    # return nearest if min_dist <= tol else None
+    return min(nodes, key=lambda node: math.hypot(node[0] - x0, node[1] - y0))
+
 def cumulative_exceed_edge(G, path, max_dist):
     cum = 0.0
     for i in range(len(path)-1):
@@ -207,7 +211,8 @@ def chlee_test_file_what_the_fuck(source, target):
             path_SN          = PSN
         )
 
-def generate_paths_from_points(edgefile_path, source, target, output_csv, k=3, target_distance=200.0, tolerance=0.05, max_time=30, middle_edges_ratio=0.02):
+def generate_paths_from_points(edgefile_path, source, target, output_csv, k=3, target_distance=20000.0, tolerance=0.05, max_time=30, middle_edges_ratio=0.02):
+    #tolerance = 0.05
     """
     Generate paths from source to target using the specified parameters.
     
@@ -221,6 +226,7 @@ def generate_paths_from_points(edgefile_path, source, target, output_csv, k=3, t
     :param output_csv: Output CSV file to save the paths.
     :param middle_edges_ratio: Ratio of edges in the middle of the path to randomly remove.
     """
+    print("enter_generate_path_func")
     df = load_edges(edgefile_path)
     print("Building graph from edges...")
     G = build_graph(df)

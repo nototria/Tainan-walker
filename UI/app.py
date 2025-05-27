@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import sys
 import os
+import traceback
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UTIL_PATH = os.path.join(BASE_DIR, "util")
 sys.path.append(UTIL_PATH)
@@ -39,7 +41,9 @@ def process_points():
         dst_xy = transformer.transform(end['lng'], end['lat'])
 
         # Generate paths from ../util/utils.py
-        generate_paths_from_points(source=src_xy,target=dst_xy)
+        edgefile_path = os.path.join(BASE_DIR,"tainan_edges.csv")
+        output_csv = os.path.join(BASE_DIR, "paths.csv")
+        generate_paths_from_points(edgefile_path, src_xy, dst_xy, output_csv)
 
         # read the path.csv, wait chli
         # input_csv = "../CSV_file/paths.csv"
@@ -51,9 +55,13 @@ def process_points():
             {"lat": (start['lat'] + end['lat']) / 2, "lng": (start['lng'] + end['lng']) / 2},
             {"lat": end['lat'], "lng": end['lng']}
         ]
+        
+        print("finishing path generate")
         return jsonify({"status": "success", "path": path})
 
     except Exception as e:
+        print("failing path generate")
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)})
     
 def run_app():

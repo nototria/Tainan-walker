@@ -6,6 +6,7 @@
     <title>Where Can I Walk?</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -74,7 +75,55 @@
             </button>
         </div>
     </div>
-    
+    <div id="loading" style="display: none;">
+        <div class="spinner"></div>
+        <div class="loading-overlay"></div>
+    </div>
+    <style>
+        .spinner {
+            margin: 20px auto;
+            width: 40px;
+            height: 40px;
+            border: 5px solid #ccc;
+            border-top-color: #2196F3;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 99999;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.5);
+            width: 100%;
+            height: 100%;
+        }
+        .spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 60px;
+            height: 60px;
+            margin: -30px 0 0 -30px;
+            z-index:100000;
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    </style>
     <div id="map"></div>
 
     <script>
@@ -158,48 +207,111 @@
 
         function sendPointsToServer() {
             if (points.length < 2) {
-                alert("Please select 2 points first.");
+                alert("Select 2 points first.");
                 return;
             }
 
             const data = {
-                start: { lat: points[0].lat, lng: points[0].lng },
-                end: { lat: points[1].lat, lng: points[1].lng }
+                start: {
+                    lat: points[0].lat,
+                    lng: points[0].lng
+                },
+                end: {
+                    lat: points[1].lat,
+                    lng: points[1].lng
+                }
             };
+
+            document.getElementById("loading").style.display = "block";
 
             fetch('/process_points', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            })
-            .then(resp => resp.json())
+            }).then(response => response.json())
             .then(result => {
-                console.log("Received path:", result.path);
-                drawPath(result.path);
-            })
-            .catch(err => {
+                document.getElementById("loading").style.display = "none";
+                if (result.status === 'success') {
+                    console.log("Received path:", result.path);
+                    drawPath(result.path);
+                    alert("Successfully get recommendation route!");
+                } else {
+                    alert("Error:" + result.message);
+                }
+            }).catch(error => {
+                document.getElementById("loading").style.display = "none";
                 console.error("Failed to fetch path:", err);
+                alert("Error:" + error);
             });
         }
 
-        function drawPath(pathCoords) {
-            if (!pathCoords || pathCoords.length < 2) return;
 
-            const latlngs = pathCoords.map(p => [p.lat, p.lng]);
+        // function drawPath(pathCoords) {
+        //     if (!pathCoords || pathCoords.length < 2) return;
 
+        //     const latlngs = pathCoords.map(p => [p.lat, p.lng]);
+
+        //     if (pathLayer) {
+        //         map.removeLayer(pathLayer);
+        //     }
+
+        //     pathLayer = L.polyline(latlngs, {
+        //         color: 'blue',
+        //         weight: 4,
+        //         opacity: 0.8
+        //     }).addTo(map);
+
+        //     map.fitBounds(pathLayer.getBounds());
+        // }
+        function drawPath(scoredEdges) {
+            if (!scoredEdges || scoredEdges.length === 0) return;
+
+            // 找出最小與最大分數，為 colormap 正規化用
+            const scores = scoredEdges.map(e => e.score);
+            const minScore = Math.min(...scores);
+            const maxScore = Math.max(...scores);
+
+            // 清除舊有路徑
             if (pathLayer) {
                 map.removeLayer(pathLayer);
             }
+            pathLayer = L.layerGroup().addTo(map);
 
-            pathLayer = L.polyline(latlngs, {
-                color: 'blue',
-                weight: 4,
-                opacity: 0.8
-            }).addTo(map);
+            // 使用 d3 插件的 Viridis colormap（或自己定義顏色階）
+            const colorScale = chroma.scale('viridis').domain([minScore, maxScore]);
 
-            map.fitBounds(pathLayer.getBounds());
+            // 每條 edge 是一段 LineString
+            scoredEdges.forEach(edge => {
+                const latlngs = [
+                    [edge.start_y, edge.start_x],
+                    [edge.end_y,   edge.end_x]
+                ];
+
+                const popup = `
+                    <b>Green ratio</b>: ${edge.green_ratio.toFixed(2)}<br>
+                    <b>Shade</b>: ${edge.shade.toFixed(2)}<br>
+                    <b>Pavement</b>: ${edge.pavement_ratio.toFixed(2)}<br>
+                    <b>Length</b>: ${edge.distance.toFixed(1)} m<br>
+                    <b>Score</b>: ${edge.score.toFixed(2)}
+                `;
+
+                const color = colorScale(edge.score).hex();
+
+                const polyline = L.polyline(latlngs, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.85
+                }).bindPopup(popup);
+
+                polyline.addTo(pathLayer);
+            });
+
+            // Zoom to bounds
+            const allLatLngs = scoredEdges.flatMap(e => [
+                [e.start_y, e.start_x],
+                [e.end_y,   e.end_x]
+            ]);
+            map.fitBounds(allLatLngs);
         }
 
         function resetEverything() {
