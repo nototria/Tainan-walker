@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Point Selection Map</title>
+    <title>Where Can I Walk?</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
@@ -63,15 +62,15 @@
             Enable Selection Mode
         </button>
         <div id="modeStatus" class="status-disabled">
-            Selection mode disabled - map navigation active
+            Selection mode disabled
         </div>
         <div id="info" style="margin-top: 10px;"></div>
         <div style="margin-top: 10px;">
             <button class="btn btn-success" onclick="sendPointsToServer()">
                 Confirm Selection
             </button>
-            <button id="reset" class="btn btn-danger" onclick="resetSelection()" style="display:none;">
-                Reset Selection
+            <button class="btn btn-danger" onclick="resetEverything()">
+                Reset Everything
             </button>
         </div>
     </div>
@@ -79,10 +78,8 @@
     <div id="map"></div>
 
     <script>
-        // Initialize map
         var map = L.map('map').setView([23.147305, 120.305786], 11);
-        
-        // Add tile layer
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
@@ -90,6 +87,7 @@
         let points = [];
         let markers = [];
         let selectionMode = false;
+        let pathLayer = null;
 
         function updateInfo() {
             const info = document.getElementById('info');
@@ -103,10 +101,7 @@
                     <b>Both Points Selected:</b><br>
                     Point A: ${points[0].lat.toFixed(6)}, ${points[0].lng.toFixed(6)}<br>
                     Point B: ${points[1].lat.toFixed(6)}, ${points[1].lng.toFixed(6)}<br>
-                    <i>Points are pinned on the map</i></div>`;
-                document.getElementById("download").style.display = "inline-block";
-                document.getElementById("reset").style.display = "inline-block";
-                // Auto-disable selection mode when done
+                    </div>`;
                 if (selectionMode) {
                     toggleSelectionMode();
                 }
@@ -121,32 +116,23 @@
             if (selectionMode) {
                 button.innerHTML = 'Disable Selection Mode';
                 button.className = 'btn btn-danger';
-                status.innerHTML = 'Selection mode enabled - click map to select points';
+                status.innerHTML = 'Selection mode enabled';
                 status.className = 'status-enabled';
-                // Change cursor to crosshair when in selection mode
                 document.getElementById('map').style.cursor = 'crosshair';
             } else {
                 button.innerHTML = 'Enable Selection Mode';
                 button.className = 'btn btn-primary';
-                status.innerHTML = 'Selection mode disabled - map navigation active';
+                status.innerHTML = 'Selection mode disabled';
                 status.className = 'status-disabled';
-                // Restore normal cursor
                 document.getElementById('map').style.cursor = '';
             }
         }
 
         function onMapClick(e) {
-            // Only respond to clicks when in selection mode
-            if (!selectionMode) {
+            if (!selectionMode || points.length >= 2) {
                 return;
             }
-            
-            if (points.length >= 2) {
-                alert("You've already selected 2 points. Use Reset to start over.");
-                return;
-            }
-            
-            // Create custom marker
+
             const markerIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="
@@ -161,83 +147,76 @@
                 iconSize: [22, 22],
                 iconAnchor: [11, 11]
             });
-            
+
             const marker = L.marker(e.latlng, { icon: markerIcon }).addTo(map);
             markers.push(marker);
-            
-            // Add point to array
             points.push(e.latlng);
             updateInfo();
         }
 
-        // Add click listener to map
         map.on('click', onMapClick);
 
-        function resetSelection() {
-            // Clear existing points
-            points = [];
+        function sendPointsToServer() {
+            if (points.length < 2) {
+                alert("Please select 2 points first.");
+                return;
+            }
+
+            const data = {
+                start: { lat: points[0].lat, lng: points[0].lng },
+                end: { lat: points[1].lat, lng: points[1].lng }
+            };
+
+            fetch('/process_points', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(resp => resp.json())
+            .then(result => {
+                console.log("Received path:", result.path);
+                drawPath(result.path);
+            })
+            .catch(err => {
+                console.error("Failed to fetch path:", err);
+            });
+        }
+
+        function drawPath(pathCoords) {
+            if (!pathCoords || pathCoords.length < 2) return;
+
+            const latlngs = pathCoords.map(p => [p.lat, p.lng]);
+
+            if (pathLayer) {
+                map.removeLayer(pathLayer);
+            }
+
+            pathLayer = L.polyline(latlngs, {
+                color: 'blue',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+
+            map.fitBounds(pathLayer.getBounds());
+        }
+
+        function resetEverything() {
             markers.forEach(marker => {
                 map.removeLayer(marker);
             });
             markers = [];
-            
-            // Hide buttons and clear info
-            document.getElementById("download").style.display = "none";
-            document.getElementById("reset").style.display = "none";
+            points = [];
+
+            if (pathLayer) {
+                map.removeLayer(pathLayer);
+                pathLayer = null;
+            }
+
             document.getElementById("info").innerHTML = "";
-            
-            // Disable selection mode
-            if (selectionMode) {
-                toggleSelectionMode();
-            }
+            if (selectionMode) toggleSelectionMode();
         }
-    function sendPointsToServer() {
-        if (points.length < 2) {
-            alert("Please select 2 points first.");
-            return;
-        }
-
-        const data = {
-            start: {
-                lat: points[0].lat,
-                lng: points[0].lng
-            },
-            end: {
-                lat: points[1].lat,
-                lng: points[1].lng
-            }
-        };
-
-        fetch('/process_points', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(resp => resp.json())
-        .then(result => {
-            console.log("Received path:", result.path);
-            drawPath(result.path);
-        })
-        .catch(err => {
-            console.error("Failed to fetch path:", err);
-        });
-    }
-
-    function drawPath(pathCoords) {
-        if (!pathCoords || pathCoords.length < 2) return;
-
-        const latlngs = pathCoords.map(p => [p.lat, p.lng]);
-
-        const polyline = L.polyline(latlngs, {
-            color: 'blue',
-            weight: 4,
-            opacity: 0.8
-        }).addTo(map);
-
-        map.fitBounds(polyline.getBounds());
-    }
     </script>
 </body>
 </html>
