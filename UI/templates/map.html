@@ -68,7 +68,7 @@
         <div id="info" style="margin-top: 10px;"></div>
         <div style="margin-top: 10px;">
             <button class="btn btn-success" onclick="sendPointsToServer()">
-                Send to Python
+                Confirm Selection
             </button>
             <button id="reset" class="btn btn-danger" onclick="resetSelection()" style="display:none;">
                 Reset Selection
@@ -191,10 +191,9 @@
                 toggleSelectionMode();
             }
         }
-
     function sendPointsToServer() {
         if (points.length < 2) {
-            alert("Select 2 points first.");
+            alert("Please select 2 points first.");
             return;
         }
 
@@ -209,14 +208,35 @@
             }
         };
 
-        fetch('/submit_points', {
+        fetch('/process_points', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(data)
-        }).then(response => response.json())
+        })
+        .then(resp => resp.json())
         .then(result => {
-            alert("Points sent to Python backend.");
+            console.log("Received path:", result.path);
+            drawPath(result.path);
+        })
+        .catch(err => {
+            console.error("Failed to fetch path:", err);
         });
+    }
+
+    function drawPath(pathCoords) {
+        if (!pathCoords || pathCoords.length < 2) return;
+
+        const latlngs = pathCoords.map(p => [p.lat, p.lng]);
+
+        const polyline = L.polyline(latlngs, {
+            color: 'blue',
+            weight: 4,
+            opacity: 0.8
+        }).addTo(map);
+
+        map.fitBounds(polyline.getBounds());
     }
     </script>
 </body>
