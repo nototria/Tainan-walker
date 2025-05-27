@@ -70,7 +70,7 @@ def sanity_check_graph(G,source, target, target_distance, tolerance):
         raise ValueError(f"Shortest path length {min_len} is out of bounds {target_distance * (1 + tolerance)}.")    
     return source, target
 
-def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv'):
+def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_distance=200.0,tolerance=0.05,max_time=30,output_csv='paths.csv', middle_edges_ratio=0.02):
     min_dist = 0
     max_dist = target_distance * (1 + tolerance)
     results = []
@@ -85,39 +85,30 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
 
         try:
             paths_iter = nx.shortest_simple_paths(G_work, source, target, weight='distance')
+            chosen = None
+            for path in paths_iter:
+                # early-stop if cumulative exceeds max_dist
+                if any(not G_work.has_edge(u,v) for u,v in path_edges(path)): continue
+                exceeded_edge, cum = cumulative_exceed_edge(G_work, path, max_dist)
+                if exceeded_edge:
+                    u, v = exceeded_edge
+                    print(f"Path {path_id} exceeds max distance at edge {u}-{v}, stopping.")
+                    break
+
+                total = cum
+                if total < min_dist or total > max_dist:
+                    u, v = path[-2], path[-1]
+                    if G_work.has_edge(u, v):
+                        G_work.remove_edge(u, v)
+                    continue
+
+                chosen = path
+                print(f"Found path {path_id} with length {total:.2f}.")
+                break
         except nx.NetworkXNoPath:
             print(f"No path available at iteration {path_id}.")
             break
 
-        chosen = None
-        for path in paths_iter:
-            # early-stop if cumulative exceeds max_dist
-            if any(not G_work.has_edge(u,v) for u,v in path_edges(path)): continue
-            exceeded_edge, cum = cumulative_exceed_edge(G_work, path, max_dist)
-            if exceeded_edge:
-                # forbid this edge
-                u, v = exceeded_edge
-                G_work.remove_edge(u, v)
-                print(f"Path {path_id} exceeds max distance at edge {u}-{v}, stopping.")
-                # if v has no outgoing edges, also forbid
-                if len(list(G_work.successors(v))) == 0 and G_work.has_edge(u, v):
-                    print(f"Path {path_id} exceeds max distance at edge {u}-{v}, stopping.")
-                    G_work.remove_edge(u, v)
-                break
-
-            # full length within max, now check min
-            total = cum
-            if total < min_dist or total > max_dist:
-                # forbid last edge
-                u, v = path[-2], path[-1]
-                if G_work.has_edge(u, v):
-                    G_work.remove_edge(u, v)
-                continue
-
-            # acceptable path
-            chosen = path
-            print(f"Found path {path_id} with length {total:.2f}.")
-            break
 
         if not chosen:
             print(f"No more paths within tolerance after {found} paths.")
@@ -147,18 +138,20 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,k=3,target_dis
         # randomly remove edges in the middle 2% of the path
         edges_list = path_edges(chosen)
         m = len(edges_list)
-        start_idx = int(m * 0.45)
-        end_idx   = int(m * 0.55)
+        start_idx = int(m * (0.5 - middle_edges_ratio/2.0))
+        end_idx   = int(m * (0.5 + middle_edges_ratio/2.0))
+
         if start_idx == end_idx:
-            print(f"Path {path_id} has no edges to forbid in middle 2%.")
+            middle_edges = edges_list[start_idx]
+            edges_to_remove = [middle_edges]
         else:
             middle_edges = edges_list[start_idx:end_idx]
             k = random.randint(1, len(middle_edges))
             edges_to_remove = random.sample(middle_edges, k)
-            
-            for u, v in edges_to_remove:
-                if G_work.has_edge(u, v):
-                    G_work.remove_edge(u, v)
+        
+        for u, v in edges_to_remove:
+            if G_work.has_edge(u, v):
+                G_work.remove_edge(u, v)
     # write CSV
     keys = ['path_id','start_x','start_y','end_x','end_y','distance',
             'green_ratio','shade','pavement_ratio']
@@ -177,11 +170,12 @@ if __name__ == '__main__':
     # testcase
     source = (214348.3195031177,2547868.730116239)
     target = (215172.271623499,2545335.762676438)
-    distance = 3500.0
-    t = 0.1
+    distance = 60000.0
+    t = 1
     k_length = 200
     maximum_time = 60
     output_csv = 'paths.csv'
+    mer = 0.005
     # testcase
 
     print("Performing sanity checks on graph...")
@@ -195,5 +189,6 @@ if __name__ == '__main__':
         target_distance = distance,
         tolerance       = t,
         max_time        = maximum_time,
-        output_csv      = output_csv
+        output_csv      = output_csv,
+        middle_edges_ratio= mer
     )
