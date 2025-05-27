@@ -166,7 +166,7 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,path_SN,k=3,ta
 
     print(f"Exported {len(results)} edges across {path_SN} paths to '{output_csv}'.")
 
-def generate_paths_from_points(source, target):
+def chlee_test_file_what_the_fuck(source, target):
     load_path = os.path.join(BASE_DIR, '..', 'CSV_file', 'tainan_edges.csv')
     df = load_edges(load_path)
     print("Building graph from edges...")
@@ -206,3 +206,38 @@ def generate_paths_from_points(source, target):
             middle_edges_ratio= mer,
             path_SN          = PSN
         )
+
+def generate_paths_from_points(edgefile_path, source, target, k=3, target_distance=200.0, tolerance=0.05, max_time=30, output_csv='paths.csv', middle_edges_ratio=0.02):
+    """
+    Generate paths from source to target using the specified parameters.
+    
+    :param edgefile: Path to the CSV file containing edges.
+    :param source: Tuple (x, y) representing the source coordinates.
+    :param target: Tuple (x, y) representing the target coordinates.
+    :param k: Number of paths to find.
+    :param target_distance: Target distance for the paths.
+    :param tolerance: Tolerance for the path length.
+    :param max_time: Maximum time allowed for finding paths.
+    :param output_csv: Output CSV file to save the paths.
+    :param middle_edges_ratio: Ratio of edges in the middle of the path to randomly remove.
+    """
+    df = load_edges(edgefile_path)
+    print("Building graph from edges...")
+    G = build_graph(df)
+    print("Performing sanity checks on graph...")
+    source_checked, target_checked = sanity_check_graph(G, source, target, target_distance, tolerance)
+    
+    print("Finding paths...")
+    PSN = {'value': 1}
+    find_k_paths_with_distance_and_tolerance(
+        G_base         = G,
+        source         = source_checked,
+        target         = target_checked,
+        k              = k,
+        target_distance= target_distance,
+        tolerance      = tolerance,
+        max_time       = max_time,
+        output_csv     = output_csv,
+        middle_edges_ratio= middle_edges_ratio,
+        path_SN          = PSN
+    )
