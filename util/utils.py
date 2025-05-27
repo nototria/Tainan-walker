@@ -5,6 +5,7 @@ import math
 import time
 import random
 import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 #Helper
 def load_edges(file_path):
@@ -166,22 +167,22 @@ def find_k_paths_with_distance_and_tolerance(G_base,source,target,found,k=3,targ
 
     print(f"Exported {len(results)} edges across {found} paths to '{output_csv}'.")
 
-if __name__ == '__main__':
-    if os.path.exists('paths.csv'):
-        os.remove('paths.csv')
-    df = load_edges('tainan_edges.csv')
+def generate_paths_from_points(source, target):
+    load_path = os.path.join(BASE_DIR, '..', 'CSV_file', 'tainan_edges.csv')
+    df = load_edges(load_path)
     print("Building graph from edges...")
     G = build_graph(df)
 
     points_df = pd.read_csv('tainan_random_routes.csv')
     # testcase
-    founded = {'value': 0}
-    distance = 500000.0
+    # source = (214348.3195031177,2547868.730116239)
+    # target = (215172.271623499,2545335.762676438)
+    distance = 60000.0
     t = 1
     k_length = 10
     maximum_time = 60
-    output_csv = 'paths.csv'
-    mer = 0.01
+    output_csv = os.path.join(BASE_DIR, '..', 'CSV_file', 'paths.csv')
+    mer = 0.005
     # testcase
 
 
