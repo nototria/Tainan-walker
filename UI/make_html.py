@@ -197,32 +197,43 @@ html_template = f"""
             }}
         }}
 
-    function sendPointsToServer() {{
-        if (points.length < 2) {{
-            alert("Select 2 points first.");
-            return;
-        }}
-
-        const data = {{
-            start: {{
-                lat: points[0].lat,
-                lng: points[0].lng
-            }},
-            end: {{
-                lat: points[1].lat,
-                lng: points[1].lng
+        function sendPointsToServer() {{
+            if (points.length < 2) {{
+                alert("Select 2 points first.");
+                return;
             }}
-        }};
 
-        fetch('/submit_points', {{
-            method: 'POST',
-            headers: {{ 'Content-Type': 'application/json' }},
-            body: JSON.stringify(data)
-        }}).then(response => response.json())
-        .then(result => {{
-            alert("Points sent to Python backend.");
-        }});
-    }}
+            const data = {{
+                start: {{
+                    lat: points[0].lat,
+                    lng: points[0].lng
+                }},
+                end: {{
+                    lat: points[1].lat,
+                    lng: points[1].lng
+                }}
+            }};
+
+            // Loading animation
+            document.getElementById("loading").style.display = "block";
+
+            fetch('/process_points', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify(data)
+            }}).then(response => response.json())
+            .then(result => {{
+                document.getElementById("loading").style.display = "none"; // 關閉 loading
+                if (result.status === 'success') {{
+                    alert("successfully get the recommendation route!");
+                }} else {{
+                    alert("fail_computing:" + result.message);
+                }}
+            }}).catch(error => {{
+                document.getElementById("loading").style.display = "none";
+                alert("backend error:" + error);
+            }});
+        }}
     </script>
 </body>
 </html>
