@@ -3,6 +3,7 @@ import sys, os, traceback
 from pyproj import Transformer
 import webbrowser, threading
 import time
+from geopy.distance import geodesic
 
 # ----- PATH SETUP -----
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -50,16 +51,22 @@ def submit_points():
 @app.route('/process_points', methods=['POST'])
 def process_points():
     data = request.get_json()
-    start = data['start']
-    end = data['end']
+    start = (data['start']['lat'],data['start']['lng'])
+    end = (data['end']['lat'], data['end']['lng'])
     desired_time = data.get('desired_time_min', 30)
-    walk_speed_m_per_min = 83.33
+    walk_speed_m_per_min = 83.3
     expected_distance = desired_time * walk_speed_m_per_min
+
+    # check validability of desired_time
+    straight_distance = geodesic(start, end).meters
+
+    if(straight_distance > desired_time * walk_speed_m_per_min):
+        return jsonify({"status": "error", "message": "Selected points are too far for the desired time."})
 
     try:
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:32651", always_xy=True)
-        src_xy = transformer.transform(start['lng'], start['lat']) 
-        dst_xy = transformer.transform(end['lng'], end['lat'])
+        src_xy = transformer.transform(start[0],start[1]) 
+        dst_xy = transformer.transform(end[0],end[1])
 
         src_checked,dst_checked = sanity_check_graph(G, src_xy, dst_xy, expected_distance, 0.05)
         print("Sanity check passed, generating paths...")
@@ -97,5 +104,5 @@ def run_app():
     app.run(debug=False, port=5000)
 
 threading.Thread(target=run_app).start()
-# time.sleep(8)
-# webbrowser.open("http://127.0.0.1:5000/")
+time.sleep(7)
+webbrowser.open("http://127.0.0.1:5000/")
