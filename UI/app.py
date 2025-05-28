@@ -13,7 +13,7 @@ from utils import read_path_from_csv, build_graph, load_edges, sanity_check_grap
 
 # ----- FILE PATHS -----
 edgefile_path = os.path.join(BASE_DIR, "tainan_edges.csv")
-output_csv = os.path.join(BASE_DIR, "paths.csv")
+output_csv = os.path.join(BASE_DIR, "model_decided_path.csv")
 
 # ----- FLASK SETUP -----
 app = Flask(__name__)
@@ -69,7 +69,7 @@ def process_points():
             G_base=G,
             source=src_checked,
             target=dst_checked,
-            k=1,
+            k=10,
             target_distance=expected_distance,
             output_csv=output_csv,
             middle_edges_ratio=0.02,
@@ -82,6 +82,8 @@ def process_points():
         #     {"lat": (start['lat'] + end['lat']) / 2, "lng": (start['lng'] + end['lng']) / 2},
         #     {"lat": end['lat'], "lng": end['lng']}
         # ]
+
+        load_model_and_run(input_csv="paths.csv", batch_size=100)
         path = read_path_from_csv(output_csv)
         
         print("Path generation finished.")

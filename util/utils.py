@@ -170,17 +170,18 @@ def find_k_path(G_base, source, target, output_csv, path_SN, k=3, target_distanc
 
     print(f"Exported {len(results)} edges across {path_SN} paths to '{output_csv}'.")
 
-def chlee_test_file_what_the_fuck(source, target):
+def generate_paths_from_file():
     load_path = os.path.join(BASE_DIR, '..', 'CSV_file', 'tainan_edges.csv')
     df = load_edges(load_path)
     print("Building graph from edges...")
     G = build_graph(df)
 
-    points_df = pd.read_csv('tainan_random_routes.csv')
+    load_random_points = os.path.join(BASE_DIR, '..', 'CSV_file', 'tainan_random_routes.csv')
+    points_df = load_edges(load_random_points)
     # testcase
     # source = (214348.3195031177,2547868.730116239)
     # target = (215172.271623499,2545335.762676438)
-    distance = 60000.0
+    distance = 10000.0
     t = 1
     k_length = 10
     maximum_time = 60
@@ -279,3 +280,6 @@ def read_path_from_csv(csv_file_path):
             }
             edges.append(edge)
     return edges
+
+if __name__ == "__main__":
+    generate_paths_from_file()
