@@ -52,13 +52,16 @@ def process_points():
     data = request.get_json()
     start = data['start']
     end = data['end']
-    
+    desired_time = data.get('desired_time_min', 30)
+    walk_speed_m_per_min = 83.33
+    expected_distance = desired_time * walk_speed_m_per_min
+
     try:
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:32651", always_xy=True)
         src_xy = transformer.transform(start['lng'], start['lat']) 
         dst_xy = transformer.transform(end['lng'], end['lat'])
 
-        src_checked,dst_checked = sanity_check_graph(G, src_xy, dst_xy, 20000.0, 0.05)
+        src_checked,dst_checked = sanity_check_graph(G, src_xy, dst_xy, expected_distance, 0.05)
         print("Sanity check passed, generating paths...")
 
         find_k_path(
@@ -66,7 +69,7 @@ def process_points():
             source=src_checked,
             target=dst_checked,
             k=1,
-            target_distance=10000.0,
+            target_distance=expected_distance,
             output_csv=output_csv,
             middle_edges_ratio=0.02,
             path_SN={'value': 0}
@@ -94,3 +97,5 @@ def run_app():
     app.run(debug=False, port=5000)
 
 threading.Thread(target=run_app).start()
+# time.sleep(8)
+# webbrowser.open("http://127.0.0.1:5000/")

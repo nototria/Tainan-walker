@@ -79,6 +79,7 @@
     <div id="loading" style="display: none;">
         <div class="spinner"></div>
         <div class="loading-overlay"></div>
+        <div class="loading-text">Calculating path...</div>
     </div>
     <style>
         .spinner {
@@ -124,6 +125,18 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+        .loading-text {
+            position: absolute;
+            top: 58%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 100001;
+            font-family: Arial, sans-serif;
+        }
+
     </style>
     <div id="map"></div>
 
