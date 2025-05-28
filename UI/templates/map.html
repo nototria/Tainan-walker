@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
     <style>
         body {
             margin: 0;
@@ -246,73 +247,88 @@
         }
 
 
-        // function drawPath(pathCoords) {
-        //     if (!pathCoords || pathCoords.length < 2) return;
+        function drawPath(pathCoords) {
+            if (!pathCoords || pathCoords.length < 2) return;
 
-        //     const latlngs = pathCoords.map(p => [p.lat, p.lng]);
+            // Define source and target projections
+            const projSrc = 'EPSG:32651'; // projected coordinates (your input)
+            const projDst = 'EPSG:4326';  // WGS84 lat/lng
 
-        //     if (pathLayer) {
-        //         map.removeLayer(pathLayer);
-        //     }
+            // If proj4 defs not registered, define EPSG:32651 (UTM zone 51N)
+            if (!proj4.defs[projSrc]) {
+                proj4.defs(projSrc, "+proj=utm +zone=51 +datum=WGS84 +units=m +no_defs");
+            }
 
-        //     pathLayer = L.polyline(latlngs, {
-        //         color: 'blue',
-        //         weight: 4,
-        //         opacity: 0.8
-        //     }).addTo(map);
+            // Convert projected coords to lat/lng
+            const latlngs = pathCoords.map(p => {
+                const [lng, lat] = proj4(projSrc, projDst, [p.lng, p.lat]); // input order: [x, y] = [lng, lat] in meters
+                return [lat, lng]; // Leaflet expects [lat, lng]
+            });
 
-        //     map.fitBounds(pathLayer.getBounds());
-        // }
-        function drawPath(scoredEdges) {
-            if (!scoredEdges || scoredEdges.length === 0) return;
-
-            // 找出最小與最大分數，為 colormap 正規化用
-            const scores = scoredEdges.map(e => e.score);
-            const minScore = Math.min(...scores);
-            const maxScore = Math.max(...scores);
-
-            // 清除舊有路徑
+            // Remove old path layer
             if (pathLayer) {
                 map.removeLayer(pathLayer);
             }
-            pathLayer = L.layerGroup().addTo(map);
 
-            // 使用 d3 插件的 Viridis colormap（或自己定義顏色階）
-            const colorScale = chroma.scale('viridis').domain([minScore, maxScore]);
+            pathLayer = L.polyline(latlngs, {
+                color: 'blue',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
 
-            // 每條 edge 是一段 LineString
-            scoredEdges.forEach(edge => {
-                const latlngs = [
-                    [edge.start_y, edge.start_x],
-                    [edge.end_y,   edge.end_x]
-                ];
-
-                const popup = `
-                    <b>Green ratio</b>: ${edge.green_ratio.toFixed(2)}<br>
-                    <b>Shade</b>: ${edge.shade.toFixed(2)}<br>
-                    <b>Pavement</b>: ${edge.pavement_ratio.toFixed(2)}<br>
-                    <b>Length</b>: ${edge.distance.toFixed(1)} m<br>
-                    <b>Score</b>: ${edge.score.toFixed(2)}
-                `;
-
-                const color = colorScale(edge.score).hex();
-
-                const polyline = L.polyline(latlngs, {
-                    color: color,
-                    weight: 4,
-                    opacity: 0.85
-                }).bindPopup(popup);
-
-                polyline.addTo(pathLayer);
-            });
-
-            // Zoom to bounds
-            const allLatLngs = scoredEdges.flatMap(e => [
-                [e.start_y, e.start_x],
-                [e.end_y,   e.end_x]
-            ]);
-            map.fitBounds(allLatLngs);
+            map.fitBounds(pathLayer.getBounds());
         }
+
+        // function drawPath(scoredEdges) {
+        //     if (!scoredEdges || scoredEdges.length === 0) return;
+
+        //     // 找出最小與最大分數，為 colormap 正規化用
+        //     const scores = scoredEdges.map(e => e.score);
+        //     const minScore = Math.min(...scores);
+        //     const maxScore = Math.max(...scores);
+
+        //     // 清除舊有路徑
+        //     if (pathLayer) {
+        //         map.removeLayer(pathLayer);
+        //     }
+        //     pathLayer = L.layerGroup().addTo(map);
+
+        //     // 使用 d3 插件的 Viridis colormap（或自己定義顏色階）
+        //     const colorScale = chroma.scale('viridis').domain([minScore, maxScore]);
+
+        //     // 每條 edge 是一段 LineString
+        //     scoredEdges.forEach(edge => {
+        //         const latlngs = [
+        //             [edge.start_y, edge.start_x],
+        //             [edge.end_y,   edge.end_x]
+        //         ];
+
+        //         const popup = `
+        //             <b>Green ratio</b>: ${edge.green_ratio.toFixed(2)}<br>
+        //             <b>Shade</b>: ${edge.shade.toFixed(2)}<br>
+        //             <b>Pavement</b>: ${edge.pavement_ratio.toFixed(2)}<br>
+        //             <b>Length</b>: ${edge.distance.toFixed(1)} m<br>
+        //             <b>Score</b>: ${edge.score.toFixed(2)}
+        //         `;
+
+        //         const color = colorScale(edge.score).hex();
+
+        //         const polyline = L.polyline(latlngs, {
+        //             color: color,
+        //             weight: 4,
+        //             opacity: 0.85
+        //         }).bindPopup(popup);
+
+        //         polyline.addTo(pathLayer);
+        //     });
+
+        //     // Zoom to bounds
+        //     const allLatLngs = scoredEdges.flatMap(e => [
+        //         [e.start_y, e.start_x],
+        //         [e.end_y,   e.end_x]
+        //     ]);
+        //     map.fitBounds(allLatLngs);
+        // }
 
         function resetEverything() {
             markers.forEach(marker => {

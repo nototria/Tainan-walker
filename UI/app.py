@@ -8,7 +8,7 @@ import time
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UTIL_PATH = os.path.join(BASE_DIR, "util")
 sys.path.append(UTIL_PATH)
-from utils import generate_paths_from_points, build_graph, load_edges, sanity_check_graph, find_k_path
+from utils import read_path_from_csv, build_graph, load_edges, sanity_check_graph, find_k_path
 
 # ----- FILE PATHS -----
 edgefile_path = os.path.join(BASE_DIR, "tainan_edges.csv")
@@ -66,18 +66,19 @@ def process_points():
             source=src_checked,
             target=dst_checked,
             k=1,
-            target_distance=20000.0,
+            target_distance=10000.0,
             output_csv=output_csv,
             middle_edges_ratio=0.02,
-            path_SN={'value': 1}
+            path_SN={'value': 0}
         )
 
         # Temporary: Return dummy path until CSV reading implemented
-        path = [
-            {"lat": start['lat'], "lng": start['lng']},
-            {"lat": (start['lat'] + end['lat']) / 2, "lng": (start['lng'] + end['lng']) / 2},
-            {"lat": end['lat'], "lng": end['lng']}
-        ]
+        # path = [
+        #     {"lat": start['lat'], "lng": start['lng']},
+        #     {"lat": (start['lat'] + end['lat']) / 2, "lng": (start['lng'] + end['lng']) / 2},
+        #     {"lat": end['lat'], "lng": end['lng']}
+        # ]
+        path = read_path_from_csv(output_csv)
         
         print("Path generation finished.")
         return jsonify({"status": "success", "path": path})
@@ -93,5 +94,3 @@ def run_app():
     app.run(debug=False, port=5000)
 
 threading.Thread(target=run_app).start()
-time.sleep(5)  # Wait for server to start
-webbrowser.open("http://127.0.0.1:5000/")
