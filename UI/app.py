@@ -51,22 +51,16 @@ def submit_points():
 @app.route('/process_points', methods=['POST'])
 def process_points():
     data = request.get_json()
-    start = (data['start']['lat'],data['start']['lng'])
-    end = (data['end']['lat'], data['end']['lng'])
+    start = data['start']
+    end = data['end']
     desired_time = data.get('desired_time_min', 30)
     walk_speed_m_per_min = 83.3
     expected_distance = desired_time * walk_speed_m_per_min
-
-    # check validability of desired_time
-    straight_distance = geodesic(start, end).meters
-
-    if(straight_distance > desired_time * walk_speed_m_per_min):
-        return jsonify({"status": "error", "message": "Selected points are too far for the desired time."})
-
     try:
+        # latitude first
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:32651", always_xy=True)
-        src_xy = transformer.transform(start[0],start[1]) 
-        dst_xy = transformer.transform(end[0],end[1])
+        src_xy = transformer.transform(start['lng'],start['lat']) 
+        dst_xy = transformer.transform(end['lng'],end['lat'])
 
         src_checked,dst_checked = sanity_check_graph(G, src_xy, dst_xy, expected_distance, 0.05)
         print("Sanity check passed, generating paths...")
