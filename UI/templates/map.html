@@ -300,9 +300,9 @@
             shade = Math.min(1, shade);
             pavement = Math.min(1, pavement);
 
-            const r = Math.round(scale * Math.pow(pavement, 0.78));
-            const g = Math.round(scale * Math.pow(green, 0.78));
-            const b = Math.round(scale * Math.pow(shade, 0.78));
+            const r = Math.round(scale * Math.pow(pavement, 1));
+            const g = Math.round(scale * Math.pow(green, 0.5));
+            const b = Math.round(scale * Math.pow(shade, 0.5));
 
             return `rgb(${r},${g},${b})`;
         }
