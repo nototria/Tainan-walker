@@ -70,7 +70,7 @@ def sanity_check_graph(G,source, target, target_distance, tolerance):
         
     min_len = nx.shortest_path_length(G, source, target, weight='distance')
     if min_len > target_distance * (1 + tolerance):
-        raise ValueError(f"Shortest path length {min_len} is out of bounds {target_distance * (1 + tolerance)}.")    
+        raise ValueError(f"Shortest path length {min_len} is larger than {target_distance * (1 + tolerance)}. Choose two closer points or increase time.")
     return source, target
 
 def find_k_path(G_base, source, target, output_csv, path_SN, k=3, target_distance=200.0, tolerance=0.05, max_time=30, middle_edges_ratio=0.02):
