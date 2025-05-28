@@ -247,88 +247,91 @@
         }
 
 
-        function drawPath(pathCoords) {
-            if (!pathCoords || pathCoords.length < 2) return;
+        // function drawPath(pathCoords) {
+        //     if (!pathCoords || pathCoords.length < 2) return;
 
-            // Define source and target projections
-            const projSrc = 'EPSG:32651'; // projected coordinates (your input)
-            const projDst = 'EPSG:4326';  // WGS84 lat/lng
+        //     // Define source and target projections
+        //     const projSrc = 'EPSG:32651'; // projected coordinates (your input)
+        //     const projDst = 'EPSG:4326';  // WGS84 lat/lng
 
-            // If proj4 defs not registered, define EPSG:32651 (UTM zone 51N)
+        //     // If proj4 defs not registered, define EPSG:32651 (UTM zone 51N)
+        //     if (!proj4.defs[projSrc]) {
+        //         proj4.defs(projSrc, "+proj=utm +zone=51 +datum=WGS84 +units=m +no_defs");
+        //     }
+
+        //     // Convert projected coords to lat/lng
+        //     const latlngs = pathCoords.map(p => {
+        //         const [lng, lat] = proj4(projSrc, projDst, [p.lng, p.lat]); // input order: [x, y] = [lng, lat] in meters
+        //         return [lat, lng]; // Leaflet expects [lat, lng]
+        //     });
+
+        //     // Remove old path layer
+        //     if (pathLayer) {
+        //         map.removeLayer(pathLayer);
+        //     }
+
+        //     pathLayer = L.polyline(latlngs, {
+        //         color: 'blue',
+        //         weight: 4,
+        //         opacity: 0.8
+        //     }).addTo(map);
+
+        //     map.fitBounds(pathLayer.getBounds());
+        // }
+
+        function mixColor(green, shade, pavement) {
+            // Normalize values (assume max expected ratio ~1)
+            const scale = 255;
+            green = Math.min(1, green);
+            shade = Math.min(1, shade);
+            pavement = Math.min(1, pavement);
+
+            const r = Math.round(scale * pavement);
+            const g = Math.round(scale * green);
+            const b = Math.round(scale * shade);
+
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function drawPath(pathEdges) {
+            if (!pathEdges || pathEdges.length === 0) return;
+
+            const projSrc = 'EPSG:32651';
+            const projDst = 'EPSG:4326';
+
             if (!proj4.defs[projSrc]) {
                 proj4.defs(projSrc, "+proj=utm +zone=51 +datum=WGS84 +units=m +no_defs");
             }
 
-            // Convert projected coords to lat/lng
-            const latlngs = pathCoords.map(p => {
-                const [lng, lat] = proj4(projSrc, projDst, [p.lng, p.lat]); // input order: [x, y] = [lng, lat] in meters
-                return [lat, lng]; // Leaflet expects [lat, lng]
-            });
-
-            // Remove old path layer
             if (pathLayer) {
                 map.removeLayer(pathLayer);
             }
 
-            pathLayer = L.polyline(latlngs, {
-                color: 'blue',
-                weight: 4,
-                opacity: 0.8
-            }).addTo(map);
+            pathLayer = L.layerGroup().addTo(map);
 
-            map.fitBounds(pathLayer.getBounds());
+            pathEdges.forEach(edge => {
+                const start = proj4(projSrc, projDst, [edge.start.lng, edge.start.lat]);
+                const end   = proj4(projSrc, projDst, [edge.end.lng, edge.end.lat]);
+
+                const color = mixColor(edge.green_ratio, edge.shade, edge.pavement_ratio);
+
+                const segment = L.polyline([[start[1], start[0]], [end[1], end[0]]], {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.9
+                });
+
+                segment.addTo(pathLayer);
+            });
+
+            const allLatLngs = pathEdges.flatMap(edge => {
+                const start = proj4(projSrc, projDst, [edge.start.lng, edge.start.lat]);
+                const end = proj4(projSrc, projDst, [edge.end.lng, edge.end.lat]);
+                return [[start[1], start[0]], [end[1], end[0]]];
+            });
+
+            map.fitBounds(L.latLngBounds(allLatLngs));
         }
-
-        // function drawPath(scoredEdges) {
-        //     if (!scoredEdges || scoredEdges.length === 0) return;
-
-        //     // 找出最小與最大分數，為 colormap 正規化用
-        //     const scores = scoredEdges.map(e => e.score);
-        //     const minScore = Math.min(...scores);
-        //     const maxScore = Math.max(...scores);
-
-        //     // 清除舊有路徑
-        //     if (pathLayer) {
-        //         map.removeLayer(pathLayer);
-        //     }
-        //     pathLayer = L.layerGroup().addTo(map);
-
-        //     // 使用 d3 插件的 Viridis colormap（或自己定義顏色階）
-        //     const colorScale = chroma.scale('viridis').domain([minScore, maxScore]);
-
-        //     // 每條 edge 是一段 LineString
-        //     scoredEdges.forEach(edge => {
-        //         const latlngs = [
-        //             [edge.start_y, edge.start_x],
-        //             [edge.end_y,   edge.end_x]
-        //         ];
-
-        //         const popup = `
-        //             <b>Green ratio</b>: ${edge.green_ratio.toFixed(2)}<br>
-        //             <b>Shade</b>: ${edge.shade.toFixed(2)}<br>
-        //             <b>Pavement</b>: ${edge.pavement_ratio.toFixed(2)}<br>
-        //             <b>Length</b>: ${edge.distance.toFixed(1)} m<br>
-        //             <b>Score</b>: ${edge.score.toFixed(2)}
-        //         `;
-
-        //         const color = colorScale(edge.score).hex();
-
-        //         const polyline = L.polyline(latlngs, {
-        //             color: color,
-        //             weight: 4,
-        //             opacity: 0.85
-        //         }).bindPopup(popup);
-
-        //         polyline.addTo(pathLayer);
-        //     });
-
-        //     // Zoom to bounds
-        //     const allLatLngs = scoredEdges.flatMap(e => [
-        //         [e.start_y, e.start_x],
-        //         [e.end_y,   e.end_x]
-        //     ]);
-        //     map.fitBounds(allLatLngs);
-        // }
 
         function resetEverything() {
             markers.forEach(marker => {
