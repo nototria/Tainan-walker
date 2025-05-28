@@ -4,6 +4,7 @@ from pyproj import Transformer
 import webbrowser, threading
 import time
 from geopy.distance import geodesic
+from model.model import load_model_and_run
 
 # ----- PATH SETUP -----
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
