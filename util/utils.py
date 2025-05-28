@@ -4,7 +4,6 @@ import csv
 import math
 import time
 import random
-from scipy.spatial import KDTree
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,7 +23,6 @@ def build_graph(df):
         }
         G.add_edge(u, v, **attrs)
     return G
-
 def find_nearest_node(coord, nodes, tol=1e-3):
     x0, y0 = coord
     # nearest, min_dist = None, float('inf')
@@ -34,7 +32,6 @@ def find_nearest_node(coord, nodes, tol=1e-3):
     #         nearest, min_dist = node, d
     # return nearest if min_dist <= tol else None
     return min(nodes, key=lambda node: math.hypot(node[0] - x0, node[1] - y0))
-
 def cumulative_exceed_edge(G, path, max_dist):
     cum = 0.0
     for i in range(len(path)-1):
