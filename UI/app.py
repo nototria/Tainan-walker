@@ -3,19 +3,18 @@ import sys, os, traceback
 from pyproj import Transformer
 import webbrowser, threading
 import time
-from geopy.distance import geodesic
-from model.model import load_model_and_run
 
 # ----- PATH SETUP -----
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UTIL_PATH = os.path.join(BASE_DIR, "util")
-sys.path.append(UTIL_PATH)
-from utils import read_path_from_csv, build_graph, load_edges, sanity_check_graph, find_k_path
+sys.path.append(BASE_DIR)
+from model.model import load_model_and_run
+from util.utils import read_path_from_csv, build_graph, load_edges, sanity_check_graph, find_k_path
 
 # ----- FILE PATHS -----
 edgefile_path = os.path.join(BASE_DIR, "tainan_edges.csv")
-output_csv = os.path.join(BASE_DIR, "model_decided_path.csv")
-
+model_path = os.path.join(BASE_DIR, "model.pt")
+searched_paths = os.path.join(BASE_DIR, "paths.csv")
+decided_path = os.path.join(BASE_DIR, "model_decided_path.csv")
 # ----- FLASK SETUP -----
 app = Flask(__name__)
 
@@ -66,14 +65,17 @@ def process_points():
         src_checked,dst_checked = sanity_check_graph(G, src_xy, dst_xy, expected_distance, 0.05)
         print("Sanity check passed, generating paths...")
 
+        with open(searched_paths, "w") as file:
+            pass
+        
         find_k_path(
             G_base=G,
             source=src_checked,
             target=dst_checked,
-            k=10,
+            k=32,
             target_distance=expected_distance,
-            output_csv=output_csv,
-            middle_edges_ratio=0.02,
+            output_csv=searched_paths,
+            middle_edges_ratio=0.01,
             path_SN={'value': 0}
         )
 
@@ -83,9 +85,9 @@ def process_points():
         #     {"lat": (start['lat'] + end['lat']) / 2, "lng": (start['lng'] + end['lng']) / 2},
         #     {"lat": end['lat'], "lng": end['lng']}
         # ]
-
-        load_model_and_run(input_csv="paths.csv", batch_size=100)
-        path = read_path_from_csv(output_csv)
+         
+        load_model_and_run(output_csv=decided_path, input_csv=searched_paths, batch_size=32)
+        path = read_path_from_csv(decided_path)
         
         print("Path generation finished.")
         return jsonify({"status": "success", "path": path})
