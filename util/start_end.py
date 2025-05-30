@@ -1,10 +1,9 @@
 import pandas as pd
-import random
 
 def main():
     input_csv = 'tainan_edges.csv'
     output_csv = 'tainan_random_routes.csv'
-    sample_size = 1000
+    sample_size = 10000
 
     # 讀取原始資料
     df = pd.read_csv(input_csv)

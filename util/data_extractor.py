@@ -1,5 +1,6 @@
 import osmnx as ox
 import os.path
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 import pandas as pd                             # A data type represent a table
 import geopandas as gpd                         # Additional geometry colume and crs operation than pandas dataframe
 from shapely.geometry import LineString         # geometry is a geoseries data type, a shapely object:point, linestring, polygon...
@@ -107,7 +108,7 @@ if __name__ == '__main__':
     #=========================#
 
     ###### Download walkable street map
-    street_path = "tainan_street.geojson"
+    street_path = os.path.join(BASE_DIR,"tainan_street.geojson")
     if os.path.exists(street_path):
         print("Loading cached street data...")
         edges = gpd.read_file(street_path).to_crs(projected_epsg)
@@ -121,7 +122,7 @@ if __name__ == '__main__':
 
     
     ###### Download green area geom->green ratio
-    green_path = "tainan_green.geojson"
+    green_path = os.path.join(BASE_DIR,"tainan_green.geojson")
     if os.path.exists(green_path):
         print("Loading cached green data...")
         green_areas = gpd.read_file(green_path).to_crs(projected_epsg)
@@ -149,7 +150,7 @@ if __name__ == '__main__':
 
    
     ###### Download shade geom->shade
-    shade_path = "tainan_shade.geojson"
+    shade_path = os.path.join(BASE_DIR,"tainan_shade.geojson")
     if os.path.exists(shade_path):
         print("Loading cached shade data...")
         shade = gpd.read_file(shade_path).to_crs(epsg=projected_epsg)
@@ -176,7 +177,7 @@ if __name__ == '__main__':
 
     
     ####### Download sidewalk geom->pavement
-    sidewalk_path = "tainan_sidewalks.geojson"
+    sidewalk_path = os.path.join(BASE_DIR,"tainan_pavement.geojson")
     if os.path.exists(sidewalk_path):
         print("Loading cached sidewalk data...")
         sidewalks = gpd.read_file(sidewalk_path).to_crs(epsg=projected_epsg)
@@ -242,7 +243,7 @@ if __name__ == '__main__':
     #============# 
     # CSV Output #
     #============#
-    csv_path = "tainan_edges.csv"
+    csv_path = os.path.join(BASE_DIR,"tainan_edges.csv")
     # Extract coordinate, each data point is coordinate under ESPG 32651
     edges['start_x'] = edges.geometry.apply(lambda line: line.coords[0][0])
     edges['start_y'] = edges.geometry.apply(lambda line: line.coords[0][1])
@@ -260,7 +261,7 @@ if __name__ == '__main__':
     #      Render map      #
     #======================#
 
-    map_path = "tainan_map.html"
+    map_path = os.path.join(BASE_DIR,"tainan_map.html")
     print("Rendering interactive map...")
     center_latlon = ox.geocode(city)
     m = folium.Map(location=center_latlon, zoom_start=14, tiles="CartoDB positron")
