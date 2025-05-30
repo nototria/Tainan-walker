@@ -12,7 +12,6 @@ Tainan-walker is a web-based route planning tool designed for pedestrians in Tai
 * [Project Structure](#project-structure)
 * [Installation](#installation)
 * [Usage](#usage)
-* [Customization](#customization)
 * [Contributing](#contributing)
 * [License](#license)
 
