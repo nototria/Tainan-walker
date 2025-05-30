@@ -50,6 +50,7 @@ Tainan-walker
 │   └── model.py
 ├── requirements.txt
 ├── tainan_edges.csv
+├── model.pt
 └── util
     ├── data_extractor.py
     ├── start_end.py
