@@ -175,6 +175,3 @@ cython_debug/
 
 # csv
 *.csv
-
-# pt
-*.pt
