@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
+
 def load_edges(file_path):
     return pd.read_csv(file_path)
 
@@ -28,7 +29,7 @@ def load_model_and_run(output_csv, input_csv="paths.csv", batch_size=100):
 
     model.load_state_dict(ckpt['model_state_dict'])
 
-    paths_df, features = calculate_TOPSIS(input_csv, n_labels=5)
+    paths_df, features = statistics(input_csv, n_labels=5)
 
     features_array = paths_df[features].values
     target_labels = paths_df['quality_label'].astype(int).values
@@ -132,7 +133,7 @@ def summarize(path, noise_std=0.0):
 
     return stats
 
-def calculate_TOPSIS(input_csv="paths_o.csv", n_labels=5):
+def statistics(input_csv="paths_o.csv", n_labels=5):
 
     df = load_edges(input_csv)
     paths_df = (
@@ -373,7 +374,7 @@ def save_model(model, X_l, y_l):
     print("model saved to model.pt")
 
 def main():
-    df, feat = calculate_TOPSIS(input_csv="traning_paths.csv", n_labels=5)
+    df, feat = statistics(input_csv="traning_paths.csv", n_labels=5)
     feat_arr, tar_labels, trained_model = train(paths_df=df, features=feat, n_epochs=100, batch_size=32, random_seed=42)
     save_model(model=trained_model, X_l=feat_arr, y_l=tar_labels)
 
