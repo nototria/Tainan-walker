@@ -7,71 +7,41 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+import lightgbm as lgb
+import joblib
+from lightgbm import LGBMClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+import matplotlib.pyplot as plt
+
 
 def load_edges(file_path):
     return pd.read_csv(file_path)
 
-def load_model_and_run(output_csv, input_csv="paths.csv", batch_size=100):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ckpt = torch.load('../model.pt', map_location=device)
+def load_model_and_run(output_csv, input_csv="paths.csv", batch_size=10):
+    bst = lgb.Booster(model_file="lgbm_model.txt")
+    
+    paths_df, features = calculate_TOPSIS(input_csv, 5)
+    X = paths_df[features].values
 
-    config = ckpt['config']
+    proba = bst.predict(X)
+    preds = np.argmax(proba, axis=1)
 
-    model = FCN(
-        in_features=config['in_features'],
-        hidden_sizes=config['hidden_sizes'],
-        n_classes=config['n_classes'],
-        dropout=config['dropout']
-    ).to(device)
-
-    model.load_state_dict(ckpt['model_state_dict'])
-
-    paths_df, features = calculate_TOPSIS(input_csv, n_labels=5)
-
-    features_array = paths_df[features].values
-    target_labels = paths_df['quality_label'].astype(int).values
-
-    test_loader = DataLoader(PathDataset(features_array, target_labels),
-                         batch_size=batch_size,
-                         shuffle=False)
-
-    criterion = nn.CrossEntropyLoss()
-
-    model.eval()
-    running_loss = 0.0
-    test_preds, test_labels = [], []
-    with torch.no_grad():
-        for Xb, yb in test_loader:
-            Xb, yb = Xb.to(device), yb.to(device)
-            logits = model(Xb)
-            loss = criterion(logits, yb)
-            running_loss += loss.item() * Xb.size(0)
-
-            preds = torch.argmax(logits, dim=1)
-            test_preds.append(preds.cpu())
-            test_labels.append(yb.cpu())
-
-    test_preds = torch.cat(test_preds)       
-    test_labels = torch.cat(test_labels)     
-
-
-    max_label = test_preds.max().item()
-
-    indices = (test_preds == max_label).nonzero(as_tuple=True)[0]
-
-    chosen_idx = indices[torch.randint(len(indices), (1,))].item()
-
-    chosen_label = test_preds[chosen_idx].item()
+    max_label = preds.max()
+    indices = np.where(preds == max_label)[0]
+    
+    chosen_idx = np.random.choice(indices)
+    chosen_label = preds[chosen_idx]
     print(f"Chosen index in test set: {chosen_idx}, label: {chosen_label}")
 
     df = load_edges(input_csv)
-
-    chosen_raw = df[df['path_id']-1 == chosen_idx]
+    chosen_raw = df[df['path_id'] == (chosen_idx + 1)]
+    
     chosen_raw.to_csv(output_csv, index=False)
+    print(f"Saved chosen path edges to {output_csv}")
 
-def summarize(path, noise_std=0.0):
+def summarize(path, noise_std=0.01):
     seg = path[['distance', 'green_ratio', 'shade', 'pavement_ratio']]
     total_dist = seg['distance'].sum()
     wavg = lambda x: (x * seg['distance']).sum() / total_dist
@@ -240,8 +210,7 @@ class PathDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 class FCN(nn.Module):
-    def __init__(self, in_features, hidden_sizes=
-                 [1024, 512, 256, 128], n_classes=5, dropout=0.3):
+    def __init__(self, in_features, hidden_sizes=[1024, 512, 256, 128], n_classes=10, dropout=0.3):
         super().__init__()
         layers = []
         prev = in_features
@@ -306,76 +275,42 @@ def train(paths_df, features, n_epochs=100, batch_size=32, random_seed=42):
         stratify=y_temp
     )
 
-    loader_train = DataLoader(PathDataset(X_train, y_train),
-                              batch_size=batch_size, shuffle=True)
-    loader_val   = DataLoader(PathDataset(X_val,   y_val),
-                              batch_size=batch_size, shuffle=False)
 
-    loader_test  = DataLoader(PathDataset(X_test,  y_test),
-                              batch_size=batch_size, shuffle=False)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = FCN(in_features=features_array.shape[1],
-                          hidden_sizes=[1024, 512, 256, 128],
-                          n_classes=len(np.unique(target_labels)), 
-                          dropout=0.3).to(device)
-
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode='min',           
-        factor=0.5,           
-        patience=3,           
-        min_lr=1e-6           
+    model = LGBMClassifier(
+      objective='multiclass',
+      num_class=len(np.unique(target_labels)),
+      learning_rate=0.05,
+      n_estimators=100,
+      num_leaves=31,
+      colsample_bytree=0.8,
+      subsample=0.8,
+      reg_alpha=0.1,
+      reg_lambda=0.1,
+      random_state=42
     )
 
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_val, y_val)],
+        eval_names=['valid'],
+        eval_metric=['multi_logloss', 'multi_error'],
+    )
 
-    with open('train_val_log.csv', 'w', newline='') as f:
-        writer = csv.writer(f); writer.writerow(['epoch','train_loss','train_acc','val_loss','val_acc'])
-
-    for epoch in range(1, n_epochs+1):
-        loss = train_epoch(model, loader_train, criterion, optimizer, device)
-
-        val_loss, val_acc = validate_epoch(model, loader_val, criterion, device)
-        scheduler.step(val_loss)
-        print(f"Epoch {epoch}/{n_epochs}  "
-              f"Train: loss={loss:.4f},   "
-              f"Val:   loss={val_loss:.4f}, acc={val_acc:.4f}")
-
-        with open('train_val_log.csv', 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([epoch, loss, f"{val_loss:.4f}", f"{val_acc:.4f}"])
-
-    test_loss, test_acc = validate_epoch(model, loader_test, criterion, device)
-    print(f"*** Test Result ***  loss={test_loss:.4f}, acc={test_acc:.4f}")
+    X_val = pd.DataFrame(X_val, columns=features)
+    y_pred = model.predict(X_val)
+    print("Validation Accuracy:", accuracy_score(y_val, y_pred))
+    print(classification_report(y_val, y_pred))
 
     return features_array, target_labels, model
 
-def save_model(model, X_l, y_l):
-
-    config = {
-        'in_features': X_l.shape[1],
-        'hidden_sizes': [1024, 512, 256, 128],
-        'n_classes': len(np.unique(y_l)),
-        'dropout': 0.3,
-        'random_seed': 42
-    }
-
-    model = {
-        'model_state_dict': model.state_dict(),    
-        'config': config                           
-    }
-
-    torch.save(model, 'model.pt')
-    print("model saved to model.pt")
+def save_model(model):
+    model.booster_.save_model("lgbm_model.txt")
+    
 
 def main():
     df, feat = calculate_TOPSIS(input_csv="traning_paths.csv", n_labels=5)
     feat_arr, tar_labels, trained_model = train(paths_df=df, features=feat, n_epochs=100, batch_size=32, random_seed=42)
-    save_model(model=trained_model, X_l=feat_arr, y_l=tar_labels)
+    save_model(model=trained_model)
 
 if __name__ == '__main__':
     main()
