@@ -374,7 +374,7 @@ def save_model(model, X_l, y_l):
     print("model saved to model.pt")
 
 def main():
-    df, feat = statistics(input_csv="traning_paths.csv", n_labels=5)
+    df, feat = statistics(input_csv="training_paths.csv", n_labels=5)
     feat_arr, tar_labels, trained_model = train(paths_df=df, features=feat, n_epochs=100, batch_size=32, random_seed=42)
     save_model(model=trained_model, X_l=feat_arr, y_l=tar_labels)
 
