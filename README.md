@@ -47,7 +47,8 @@ Tainan-walker
 │   └── templates
 │       └── map.html
 ├── model
-│   └── model.py
+│   ├── model.py
+|   └── LightGBM.py
 ├── requirements.txt
 ├── tainan_edges.csv
 ├── model.pt
@@ -106,6 +107,10 @@ To set up the project locally, follow the steps below:
    * Blue tones represent better shade coverage.
    * Mixed tones reflect combinations of the three factors.
 5. **Legend Reference**: A legend in the bottom-right corner clarifies the color encoding used for each environmental factor.
+6. **Train the Model(Optional for developers)**: To retrain the path scoring model with new data, simply execute: 
+   ```bash
+   python model/model.py
+   ```
 
 ## Contributing
 
